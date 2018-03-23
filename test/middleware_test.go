@@ -101,6 +101,14 @@ func TestValidateAPIKeyFromDB(t *testing.T) {
 	fmt.Println("cacheAppID: ", cacheAppID)
 	assertEqual(t, cacheAppID, appID, "not found in cache")
 
+	isCache, err = m.ValidateAPIKey(appID, key)
+	if err != nil {
+		t.Log(err.Error())
+		panic(err)
+	}
+
+	assertEqual(t, isCache, true, "")
+
 	shutdown(db, appID, key)
 }
 

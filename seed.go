@@ -5,11 +5,12 @@ import (
 	"fmt"
 
 	_ "github.com/lib/pq"
+	"github.com/tanopwan/go-gateway-api-key/middleware"
 )
 
 var commands = []string{
-	"DROP TABLE keys",
-	"CREATE TABLE keys (id text, app_id text, key text, created timestamp without time zone)",
+	"DROP TABLE %s",
+	"CREATE TABLE %s (id text, app_id text, key text, created timestamp without time zone)",
 }
 
 func main() {
@@ -26,8 +27,9 @@ func main() {
 	}
 
 	for _, command := range commands {
-		fmt.Println("Exec command:", command)
-		if _, err = db.Exec(command); err != nil {
+		format := fmt.Sprintf(command, middleware.TableName)
+		fmt.Println("Exec command:", format)
+		if _, err = db.Exec(format); err != nil {
 			panic(err)
 		}
 	}

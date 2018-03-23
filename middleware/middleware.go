@@ -80,7 +80,7 @@ func (m *middleware) ValidateAPIKey(appID string, key string) (bool, error) {
 
 	appKey := appKey{}
 
-	command := fmt.Sprintf("SELECT * FROM %s WHERE APP_ID = $1 AND KEY = $2", TableName)
+	command := fmt.Sprintf("SELECT * FROM %s WHERE APP_ID = $1 AND KEY = $2 ORDER BY CREATED DESC", TableName)
 	err := m.db.QueryRow(command, appID, key).Scan(&appKey.ID, &appKey.AppID, &appKey.Key, &appKey.Created)
 	if err == sql.ErrNoRows {
 		return false, fmt.Errorf("key is invalid")

@@ -40,9 +40,9 @@ func setup() (*sql.DB, *redis.Pool) {
 	return db, redisPool
 }
 
-func shutdown(db *sql.DB, appID string, key string) {
-	command := fmt.Sprintf("DELETE FROM %s WHERE APP_ID = $1 AND KEY = $2", middleware.TableName)
-	_, err := db.Exec(command, appID, key)
+func shutdown(db *sql.DB, appID string) {
+	command := fmt.Sprintf("DELETE FROM %s WHERE APP_ID = $1", middleware.TableName)
+	_, err := db.Exec(command, appID)
 	if err != nil {
 		panic(err)
 	}
@@ -71,7 +71,7 @@ func TestCreateAPIKey(t *testing.T) {
 		panic(err)
 	}
 	assertEqual(t, len(key), 64, fmt.Sprintf("invalid key length of %d", len(key)))
-	shutdown(db, appID, key)
+	shutdown(db, appID)
 }
 
 func TestValidateAPIKeyFromDB(t *testing.T) {
@@ -109,7 +109,7 @@ func TestValidateAPIKeyFromDB(t *testing.T) {
 
 	assertEqual(t, isCache, true, "")
 
-	shutdown(db, appID, key)
+	shutdown(db, appID)
 }
 
 func TestValidateAPIKeyFromRedis(t *testing.T) {
@@ -135,5 +135,5 @@ func TestValidateAPIKeyFromRedis(t *testing.T) {
 	}
 
 	assertEqual(t, isCache, true, "")
-	shutdown(db, appID, key)
+	shutdown(db, appID)
 }

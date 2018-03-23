@@ -65,7 +65,7 @@ func (m *middleware) GenerateAPIKey(appID string) (string, error) {
 }
 
 func (m *middleware) ValidateAPIKey(appID string, key string) (bool, error) {
-	if len(appID) < 16 || len(key) < 32 {
+	if len(appID) < 16 || len(key) < 64 {
 		return false, fmt.Errorf("parameters are invalid")
 	}
 
@@ -99,5 +99,11 @@ func (m *middleware) ValidateAPIKey(appID string, key string) (bool, error) {
 	}
 
 	fmt.Println("Validated Pass ", appKey.ID)
+
+	_, err = rd.Do("SETEX", key, int64(time.Hour/time.Second), appID)
+	if err != nil {
+		panic(err)
+	}
+
 	return false, nil
 }

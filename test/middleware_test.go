@@ -48,6 +48,16 @@ func shutdown(db *sql.DB, appID string, key string) {
 	}
 }
 
+func assertEqual(t *testing.T, a interface{}, b interface{}, message string) {
+	if a == b {
+		return
+	}
+	if len(message) == 0 {
+		message = fmt.Sprintf("%v != %v", a, b)
+	}
+	t.Fatal(message)
+}
+
 func TestCreateAPIKey(t *testing.T) {
 	db, _ := setup()
 	defer db.Close()
@@ -60,7 +70,7 @@ func TestCreateAPIKey(t *testing.T) {
 		t.Log(err.Error())
 		panic(err)
 	}
-	t.Log(key)
+	assertEqual(t, len(key), 64, fmt.Sprintf("invalid key length of %d", len(key)))
 	shutdown(db, appID, key)
 }
 
@@ -76,13 +86,21 @@ func TestValidateAPIKeyFromDB(t *testing.T) {
 		t.Log(err.Error())
 		panic(err)
 	}
-	t.Log(key)
 
-	_, err = m.ValidateAPIKey(appID, key)
+	isCache, err := m.ValidateAPIKey(appID, key)
 	if err != nil {
 		t.Log(err.Error())
 		panic(err)
 	}
+
+	assertEqual(t, isCache, false, "")
+
+	rd := redisPool.Get()
+	defer rd.Close()
+	cacheAppID, _ := redis.String(rd.Do("GET", key))
+	fmt.Println("cacheAppID: ", cacheAppID)
+	assertEqual(t, cacheAppID, appID, "not found in cache")
+
 	shutdown(db, appID, key)
 }
 
@@ -96,7 +114,7 @@ func TestValidateAPIKeyFromRedis(t *testing.T) {
 	defer rd.Close()
 
 	appID := "1234567812345678"
-	key := "12345678123456781234567812345678"
+	key := "1234567812345678123456781234567812345678123456781234567812345678"
 	_, err := rd.Do("SETEX", key, int64(time.Hour/time.Second), appID)
 	if err != nil {
 		panic(err)
@@ -108,6 +126,6 @@ func TestValidateAPIKeyFromRedis(t *testing.T) {
 		panic(err)
 	}
 
-	t.Log(isCache)
+	assertEqual(t, isCache, true, "")
 	shutdown(db, appID, key)
 }

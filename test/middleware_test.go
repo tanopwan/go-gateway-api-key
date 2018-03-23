@@ -87,13 +87,13 @@ func TestValidateAPIKeyFromDB(t *testing.T) {
 		panic(err)
 	}
 
-	isCache, err := m.ValidateAPIKey(appID, key)
+	appInfo, err := m.ValidateAPIKey(key)
 	if err != nil {
 		t.Log(err.Error())
 		panic(err)
 	}
 
-	assertEqual(t, isCache, false, "")
+	assertEqual(t, appInfo.IsCache, false, "")
 
 	rd := redisPool.Get()
 	defer rd.Close()
@@ -101,13 +101,13 @@ func TestValidateAPIKeyFromDB(t *testing.T) {
 	fmt.Println("cacheAppID: ", cacheAppID)
 	assertEqual(t, cacheAppID, appID, "not found in cache")
 
-	isCache, err = m.ValidateAPIKey(appID, key)
+	appInfo, err = m.ValidateAPIKey(key)
 	if err != nil {
 		t.Log(err.Error())
 		panic(err)
 	}
 
-	assertEqual(t, isCache, true, "")
+	assertEqual(t, appInfo.IsCache, true, "")
 
 	shutdown(db, appID)
 }
@@ -128,12 +128,12 @@ func TestValidateAPIKeyFromRedis(t *testing.T) {
 		panic(err)
 	}
 
-	isCache, err := m.ValidateAPIKey(appID, key)
+	appInfo, err := m.ValidateAPIKey(key)
 	if err != nil {
 		t.Log(err.Error())
 		panic(err)
 	}
 
-	assertEqual(t, isCache, true, "")
+	assertEqual(t, appInfo.IsCache, true, "")
 	shutdown(db, appID)
 }

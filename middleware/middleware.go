@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
 )
 
@@ -16,10 +18,16 @@ var (
 	TableName = "api_keys"
 )
 
+// AppInfo ... is returned when validate api key
+type AppInfo struct {
+	AppID   string
+	IsCache bool
+}
+
 // Service ...
 type Service interface {
 	GenerateAPIKey(appID string) (string, error)
-	ValidateAPIKey(appID string, key string) (bool, error)
+	ValidateAPIKey(key string) (*AppInfo, error)
 }
 
 type middleware struct {
@@ -37,6 +45,28 @@ type appKey struct {
 	AppID   string
 	Key     string
 	Created time.Time
+}
+
+// ValidateAPIKeyMiddleWare ...
+func ValidateAPIKeyMiddleWare(db *sql.DB, redisPool *redis.Pool) gin.HandlerFunc {
+	middleware := NewService(db, redisPool)
+
+	return func(c *gin.Context) {
+		apiKey := c.GetHeader("X-Api-Key")
+
+		appInfo, err := middleware.ValidateAPIKey(apiKey)
+		if err != nil {
+			fmt.Println("err:", err)
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"code":    "fail",
+				"message": "forbidden",
+			})
+			return
+		}
+
+		c.Next()
+		fmt.Println("appId:", appInfo.AppID)
+	}
 }
 
 // GenerateAPIKey ... will generate random api key for an app
@@ -64,46 +94,46 @@ func (m *middleware) GenerateAPIKey(appID string) (string, error) {
 	return key, nil
 }
 
-func (m *middleware) ValidateAPIKey(appID string, key string) (bool, error) {
-	if len(appID) < 16 || len(key) < 64 {
-		return false, fmt.Errorf("parameters are invalid")
+func (m *middleware) ValidateAPIKey(key string) (*AppInfo, error) {
+	if len(key) < 64 {
+		return nil, fmt.Errorf("parameter is invalid")
 	}
 
 	rd := m.redisPool.Get()
 	defer rd.Close()
 
 	cacheAppID, _ := redis.String(rd.Do("GET", key))
-	if cacheAppID == appID {
-		fmt.Println("Validated Pass found cache for appID", appID)
-		return true, nil
+	if cacheAppID != "" {
+		fmt.Println("Validated Pass found cache for appID", cacheAppID)
+		return &AppInfo{AppID: cacheAppID, IsCache: true}, nil
 	}
 
 	appKey := appKey{}
 
-	command := fmt.Sprintf("SELECT * FROM %s WHERE APP_ID = $1 AND KEY = $2 ORDER BY CREATED DESC", TableName)
-	err := m.db.QueryRow(command, appID, key).Scan(&appKey.ID, &appKey.AppID, &appKey.Key, &appKey.Created)
+	command := fmt.Sprintf("SELECT * FROM %s WHERE KEY = $1 ORDER BY CREATED DESC", TableName)
+	err := m.db.QueryRow(command, key).Scan(&appKey.ID, &appKey.AppID, &appKey.Key, &appKey.Created)
 	if err == sql.ErrNoRows {
-		return false, fmt.Errorf("key is invalid")
+		return nil, fmt.Errorf("key is invalid")
 	}
 
 	if pqErr, ok := err.(*pq.Error); ok {
-		return false, fmt.Errorf("failed to query api key with reason: %s : %s", pqErr.Code, pqErr.Message)
+		return nil, fmt.Errorf("failed to query api key with reason: %s : %s", pqErr.Code, pqErr.Message)
 	}
 
 	if err != nil {
-		return false, fmt.Errorf("failed to query api key with error: %s", err.Error())
+		return nil, fmt.Errorf("failed to query api key with error: %s", err.Error())
 	}
 
-	if appID != appKey.AppID || key != appKey.Key {
-		return false, fmt.Errorf("failed to query api key")
+	if appKey.AppID == "" {
+		return nil, fmt.Errorf("failed to query api key")
 	}
 
 	fmt.Println("Validated Pass ", appKey.ID)
 
-	_, err = rd.Do("SETEX", key, int64(time.Hour/time.Second), appID)
+	_, err = rd.Do("SETEX", key, int64(time.Hour/time.Second), appKey.AppID)
 	if err != nil {
 		panic(err)
 	}
 
-	return false, nil
+	return &AppInfo{AppID: appKey.AppID, IsCache: false}, nil
 }

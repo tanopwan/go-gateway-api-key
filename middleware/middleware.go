@@ -19,7 +19,7 @@ var (
 // Service ...
 type Service interface {
 	GenerateAPIKey(appID string) (string, error)
-	ValidateAPIKey(appID string, key string) error
+	ValidateAPIKey(appID string, key string) (bool, error)
 }
 
 type middleware struct {
@@ -64,28 +64,40 @@ func (m *middleware) GenerateAPIKey(appID string) (string, error) {
 	return key, nil
 }
 
-func (m *middleware) ValidateAPIKey(appID string, key string) error {
+func (m *middleware) ValidateAPIKey(appID string, key string) (bool, error) {
+	if len(appID) < 16 || len(key) < 32 {
+		return false, fmt.Errorf("parameters are invalid")
+	}
+
+	rd := m.redisPool.Get()
+	defer rd.Close()
+
+	cacheAppID, _ := redis.String(rd.Do("GET", key))
+	if cacheAppID == appID {
+		fmt.Println("Validated Pass found cache for appID", appID)
+		return true, nil
+	}
 
 	appKey := appKey{}
 
 	command := fmt.Sprintf("SELECT * FROM %s WHERE APP_ID = $1 AND KEY = $2", TableName)
 	err := m.db.QueryRow(command, appID, key).Scan(&appKey.ID, &appKey.AppID, &appKey.Key, &appKey.Created)
 	if err == sql.ErrNoRows {
-		return fmt.Errorf("key is invalid")
+		return false, fmt.Errorf("key is invalid")
 	}
 
 	if pqErr, ok := err.(*pq.Error); ok {
-		return fmt.Errorf("failed to query api key with reason: %s : %s", pqErr.Code, pqErr.Message)
+		return false, fmt.Errorf("failed to query api key with reason: %s : %s", pqErr.Code, pqErr.Message)
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to query api key with error: %s", err.Error())
+		return false, fmt.Errorf("failed to query api key with error: %s", err.Error())
 	}
 
 	if appID != appKey.AppID || key != appKey.Key {
-		return fmt.Errorf("failed to query api key")
+		return false, fmt.Errorf("failed to query api key")
 	}
 
 	fmt.Println("Validated Pass ", appKey.ID)
-	return nil
+	return false, nil
 }

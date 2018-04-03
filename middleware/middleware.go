@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	// TableName ... to keep api-keys for apps
-	TableName = "api_keys"
+	// TableName ... to keep api-key for apps
+	TableName = "api_key"
 )
 
 // AppInfo ... is returned when validate api key

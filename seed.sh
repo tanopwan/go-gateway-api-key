@@ -1,0 +1,1 @@
+env PG_HOST=35.240.168.164 PG_DATABASE=postgres PG_USER=app PG_PASSWORD=dev go run seed.go

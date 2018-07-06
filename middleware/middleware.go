@@ -64,6 +64,7 @@ func ValidateAPIKeyMiddleWare(db *sql.DB, redisPool *redis.Pool) gin.HandlerFunc
 			return
 		}
 
+		c.Set("app_id", appInfo.AppID)
 		c.Next()
 		fmt.Println("appId:", appInfo.AppID)
 	}

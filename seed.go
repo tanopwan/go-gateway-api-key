@@ -3,19 +3,26 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"os"
 
 	_ "github.com/lib/pq"
 	"github.com/tanopwan/go-gateway-api-key/middleware"
 )
 
 var commands = []string{
-	"DROP TABLE %s",
+	// "DROP TABLE %s",
 	"CREATE TABLE %s (id text, app_id text, key text, created timestamp without time zone)",
 }
 
 func main() {
 
-	db, err := sql.Open("postgres", "postgres://app:password@localhost/tanopwan?sslmode=disable")
+	host := os.Getenv("PG_HOST")
+	database := os.Getenv("PG_DATABASE")
+	user := os.Getenv("PG_USER")
+	password := os.Getenv("PG_PASSWORD")
+
+	connStr := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", user, password, host, database)
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		panic(err)
 	}

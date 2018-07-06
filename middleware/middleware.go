@@ -16,6 +16,7 @@ import (
 var (
 	// TableName ... to keep api-key for apps
 	TableName = "api_key"
+	prefix    = "api_"
 )
 
 // AppInfo ... is returned when validate api key
@@ -103,7 +104,7 @@ func (m *middleware) ValidateAPIKey(key string) (*AppInfo, error) {
 	rd := m.redisPool.Get()
 	defer rd.Close()
 
-	cacheAppID, _ := redis.String(rd.Do("GET", key))
+	cacheAppID, _ := redis.String(rd.Do("GET", prefix+key))
 	if cacheAppID != "" {
 		fmt.Println("Validated Pass found cache for appID", cacheAppID)
 		return &AppInfo{AppID: cacheAppID, IsCache: true}, nil
@@ -131,7 +132,7 @@ func (m *middleware) ValidateAPIKey(key string) (*AppInfo, error) {
 
 	fmt.Println("Validated Pass ", appKey.ID)
 
-	_, err = rd.Do("SETEX", key, int64(time.Hour/time.Second), appKey.AppID)
+	_, err = rd.Do("SETEX", prefix+key, int64(time.Hour/time.Second), appKey.AppID)
 	if err != nil {
 		panic(err)
 	}
